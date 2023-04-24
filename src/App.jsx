@@ -1,13 +1,24 @@
 import { useEffect, useState } from "react";
+import axios from "axios";
 import Web3 from "web3";
-import { CONTRACT_ABI, CONTRACT_ADDRESS } from "./web3.config";
+import {
+  CONTRACT_ABI,
+  CONTRACT_ADDRESS,
+  NFT_CONTRACT_ABI,
+  NFT_CONTRACT_ADDRESS,
+} from "./web3.config";
 
-const web3 = new Web3("https://rpc-mumbai.maticvigil.com");
+const web3 = new Web3(window.ethereum);
 const contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
+const nftContract = new web3.eth.Contract(
+  NFT_CONTRACT_ABI,
+  NFT_CONTRACT_ADDRESS
+);
 
 function App() {
   const [account, setAccount] = useState("");
   const [myBalance, setMyBalance] = useState("");
+  const [nftMetadata, setNftMetadata] = useState();
 
   const onClickAccount = async () => {
     try {
@@ -41,9 +52,54 @@ function App() {
     }
   };
 
-  // useEffect(() => {
-  //   console.log();
-  // }, []);
+  const onClickMint = async () => {
+    try {
+      if (!account) return;
+
+      // 간단 버전
+      // const uri =
+      //   "https://gateway.pinata.cloud/ipfs/QmexSTqQx9ZB7nyy3VULwkmhNgPrfCVhCATXH3G6VSTcVz";
+
+      // const result = await nftContract.methods.mintNft(uri).send({
+      //   from: account,
+      // });
+
+      // if (!result.status) return;
+
+      // const response = await axios.get(uri);
+
+      // 정석 버전
+      const result = await nftContract.methods
+        .mintNft(
+          "https://gateway.pinata.cloud/ipfs/QmexSTqQx9ZB7nyy3VULwkmhNgPrfCVhCATXH3G6VSTcVz"
+        )
+        .send({
+          from: account,
+        });
+
+      if (!result.status) return;
+
+      const balanceOf = await nftContract.methods.balanceOf(account).call();
+
+      const tokenOfOwnerByIndex = await nftContract.methods
+        .tokenOfOwnerByIndex(account, parseInt(balanceOf) - 1)
+        .call();
+
+      const tokenURI = await nftContract.methods
+        .tokenURI(tokenOfOwnerByIndex)
+        .call();
+
+      const response = await axios.get(tokenURI);
+
+      setNftMetadata(response.data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    console.log(nftContract.methods);
+  }, []);
 
   return (
     <div className="bg-red-100 min-h-screen flex justify-center items-center">
@@ -65,6 +121,26 @@ function App() {
                 {myBalance} tMatic
               </div>
             )}
+          </div>
+          <div className="flex flex-col items-center mt-4 gap-4">
+            {nftMetadata && (
+              <div>
+                <img src={nftMetadata.image} alt="NFT" />
+                <div>Name : {nftMetadata.name}</div>
+                <div>Description : {nftMetadata.description}</div>
+                {nftMetadata.attributes.map((v, i) => {
+                  return (
+                    <div>
+                      <span>{v.trait_type} : </span>
+                      <span>{v.value}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <button onClick={onClickMint} className="btn-style mr-4">
+              민팅
+            </button>
           </div>
         </div>
       ) : (
